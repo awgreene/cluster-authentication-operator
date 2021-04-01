@@ -11,6 +11,7 @@ import (
 	"github.com/ghodss/yaml"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
@@ -94,7 +95,43 @@ func getOAuthServerDeployment(operatorConfig *operatorv1.Authentication, proxyCo
 	templateSpec.Volumes = append(templateSpec.Volumes, v...)
 	container.VolumeMounts = append(container.VolumeMounts, m...)
 
+	if isComponentRoutePresent(&operatorConfig.Spec.ObservedConfig) {
+		templateSpec.Volumes = append(templateSpec.Volumes, corev1.Volume{
+			Name: "v4-0-config-system-custom-router-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "v4-0-config-system-custom-router-certs",
+				},
+			},
+		})
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name:      "v4-0-config-system-custom-router-certs",
+			ReadOnly:  true,
+			MountPath: "/var/config/system/secrets/v4-0-config-system-custom-router-certs",
+		})
+	}
+
 	return deployment, nil
+}
+
+func isComponentRoutePresent(operatorConfig *runtime.RawExtension) bool {
+	var configDeserialized map[string]interface{}
+	oauthServerObservedConfig, err := common.UnstructuredConfigFrom(operatorConfig.Raw, configobservation.OAuthServerConfigPrefix)
+	if err != nil {
+		return false
+	}
+
+	if err := yaml.Unmarshal(oauthServerObservedConfig, &configDeserialized); err != nil {
+		return false
+	}
+
+	componentRoutePath := []string{"servingInfo", "componentRoutes"}
+	currentNamedCertificates, _, err := unstructured.NestedFieldCopy(configDeserialized, componentRoutePath...)
+	if err != nil {
+		return false
+	}
+
+	return len(currentNamedCertificates.([]interface{})) > 0
 }
 
 func getSyncDataFromOperatorConfig(operatorConfig *runtime.RawExtension) (*datasync.ConfigSyncData, error) {

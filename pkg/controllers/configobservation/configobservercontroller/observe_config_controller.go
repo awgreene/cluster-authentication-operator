@@ -14,6 +14,7 @@ import (
 
 	"github.com/openshift/cluster-authentication-operator/pkg/controllers/configobservation"
 	"github.com/openshift/cluster-authentication-operator/pkg/controllers/configobservation/console"
+	"github.com/openshift/cluster-authentication-operator/pkg/controllers/configobservation/customroutersecret"
 	"github.com/openshift/cluster-authentication-operator/pkg/controllers/configobservation/infrastructure"
 	"github.com/openshift/cluster-authentication-operator/pkg/controllers/configobservation/oauth"
 	"github.com/openshift/cluster-authentication-operator/pkg/controllers/configobservation/routersecret"
@@ -71,6 +72,7 @@ func NewConfigObserver(
 		oauth.ObserveTokenConfig,
 		configobserveroauth.ObserveAccessTokenInactivityTimeout,
 		routersecret.ObserveRouterSecret,
+		customroutersecret.NewObserveCustomRouterSecret(),
 	} {
 		oauthServerObservers = append(oauthServerObservers,
 			configobserver.WithPrefix(o, configobservation.OAuthServerConfigPrefix))
@@ -82,6 +84,7 @@ func NewConfigObserver(
 		configobservation.Listers{
 			ConfigMapLister: kubeInformersForNamespaces.ConfigMapLister(),
 			SecretsLister:   kubeInformersForNamespaces.SecretLister(),
+			IngressLister:   configInformer.Config().V1().Ingresses().Lister(),
 
 			APIServerLister_:     configInformer.Config().V1().APIServers().Lister(),
 			ConsoleLister:        configInformer.Config().V1().Consoles().Lister(),
